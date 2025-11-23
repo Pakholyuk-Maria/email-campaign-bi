@@ -47,7 +47,7 @@
 - **Python**, **Pandas**
 - **Streamlit** — веб-интерфейс
 - **PostgreSQL** (облако **Neon**) — хранилище данных
-- **SQLAlchemy** / `psycopg2` — подключение к БД
+- **SQLAlchemy** / psycopg2 — подключение к БД
 - **Faker** — генерация тестовых данных
 
 ## Структура проекта

@@ -2,13 +2,16 @@ import os
 import random
 from datetime import datetime, timezone, timedelta
 import pandas as pd
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 
 
-DATABASE_URL = os.environ["DATABASE_URL"]
+DATABASE_URL = os.getenv("DATABASE_URL")
 engine = create_engine(DATABASE_URL)
 
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL is not set")
 
+engine = create_engine(DATABASE_URL)
 def get_templates() -> pd.DataFrame:
     """Вернуть все активные шаблоны писем."""
     with engine.connect() as conn:
@@ -199,3 +202,4 @@ def get_reactivation_candidates(inactive_days: int = 30) -> pd.DataFrame:
         df = pd.read_sql(sql, conn, params={"cutoff": cutoff})
 
     return df
+

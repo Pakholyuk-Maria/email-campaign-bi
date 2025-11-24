@@ -111,7 +111,7 @@ if page == "Рассылка":
         template_row = templates_df[templates_df["id"] == selected_template_id].iloc[0]
         with st.expander("Посмотреть тему и текст письма (общий вид)"):
             st.markdown(f"**Тема:** {template_row['subject']}")
-            st.markdown("**Тело (пример для мужчины):**")
+            st.markdown("**Тело письма:**")
             st.write(template_row["body_male"])
 
     # Обработка кнопки
@@ -302,3 +302,4 @@ elif page == "Аналитика":
 
             st.write("График open_rate / click_rate по сегментам:")
             st.bar_chart(agg_segment[["open_rate", "click_rate"]])
+

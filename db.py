@@ -147,3 +147,55 @@ def get_campaign_clients_joined() -> pd.DataFrame:
     with engine.connect() as conn:
         df = pd.read_sql(sql, conn)
     return df
+
+def get_reactivation_candidates(inactive_days: int = 30) -> pd.DataFrame:
+    """
+    Вернуть клиентов, которые давно не проявляли активность
+    (не открывали и не кликали письма inactive_days дней).
+
+    inactive_days: сколько дней без активности считаем "уснувшим" клиентом.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(days=inactive_days)
+
+    sql = text("""
+        WITH last_activity AS (
+            SELECT
+                c.id AS client_id,
+                MAX(cc.sent_at) AS last_sent_at,
+                MAX(
+                    COALESCE(cc.opened_at, cc.clicked_at)
+                ) AS last_activity_at
+            FROM clients c
+            LEFT JOIN campaign_clients cc ON cc.client_id = c.id
+            GROUP BY c.id
+        )
+        SELECT
+            c.id,
+            c.full_name,
+            c.email,
+            c.gender,
+            c.segment,
+            la.last_sent_at,
+            la.last_activity_at
+        FROM clients c
+        JOIN last_activity la ON la.client_id = c.id
+        WHERE
+            -- либо активности вообще не было, но что-то отправляли давно
+            (
+                la.last_activity_at IS NULL
+                AND la.last_sent_at IS NOT NULL
+                AND la.last_sent_at < :cutoff
+            )
+            OR
+            -- либо активность была, но давно
+            (
+                la.last_activity_at IS NOT NULL
+                AND la.last_activity_at < :cutoff
+            )
+        ORDER BY la.last_activity_at NULLS FIRST, la.last_sent_at
+    """)
+
+    with engine.connect() as conn:
+        df = pd.read_sql(sql, conn, params={"cutoff": cutoff})
+
+    return df

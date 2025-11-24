@@ -17,9 +17,9 @@ st.title("Система email-рассылок и аналитики")
 
 page = st.sidebar.radio("Страница", ["Рассылка", "Аналитика"])
 
-# ---------- СТРАНИЦА «РАССЫЛКА» ----------
 if page == "Рассылка":
     st.header("Создание кампании")
+    st.caption("Выберите шаблон, целевую аудиторию и создайте рассылку.")
 
     # Загружаем данные из БД
     templates_df = get_templates()
@@ -33,89 +33,100 @@ if page == "Рассылка":
         st.error("В базе нет ни одного клиента.")
         st.stop()
 
-    # --- выбор шаблона ---
-    template_options = {
-        f"{row['id']}: {row['name']} ({row['type']})": row["id"]
-        for _, row in templates_df.iterrows()
-    }
+    left_col, right_col = st.columns([2, 1])
 
-    selected_template_label = st.selectbox(
-        "Выберите шаблон письма",
-        options=list(template_options.keys()),
-    )
-    selected_template_id = template_options[selected_template_label]
+    # ---------- ЛЕВАЯ КОЛОНКА: ФОРМА ----------
+    with left_col:
+        st.subheader("Настройки кампании")
 
-    # тип выбранного шаблона (WELCOME / DISCOUNT / WINBACK и т.д.)
-    selected_template_type = templates_df.loc[
-        templates_df["id"] == selected_template_id, "type"
-    ].iloc[0]
+        # выбор шаблона
+        template_options = {
+            f"{row['id']}: {row['name']} ({row['type']})": row["id"]
+            for _, row in templates_df.iterrows()
+        }
 
-    # --- подготовка списка клиентов ---
-    st.subheader("Выберите клиентов")
+        selected_template_label = st.selectbox(
+            "Шаблон письма",
+            options=list(template_options.keys()),
+        )
+        selected_template_id = template_options[selected_template_label]
 
-    client_options = {
-        f"{row['id']}: {row['full_name']} ({row['email']}) [{row['segment']}]": row["id"]
-        for _, row in clients_df.iterrows()
-    }
+        selected_template_type = templates_df.loc[
+            templates_df["id"] == selected_template_id, "type"
+        ].iloc[0]
 
-    # ---------- автоподбор «уснувших» для WINBACK ----------
-    reactive_default_labels = []
-    reactive_info = ""
+        # подготовка списка клиентов
+        client_options = {
+            f"{row['id']}: {row['full_name']} ({row['email']}) [{row['segment']}]": row["id"]
+            for _, row in clients_df.iterrows()
+        }
 
-    if selected_template_type.upper() == "WINBACK":
-        inactive_days = 30  # можно потом вынести в настройку
-        react_df = get_reactivation_candidates(inactive_days)
+        # автоподбор уснувших для WINBACK
+        reactive_default_labels = []
+        reactive_info = ""
 
-        if not react_df.empty:
-            # id клиентов-кандидатов
-            react_ids = set(react_df["id"].tolist())
+        if selected_template_type.upper() == "WINBACK":
+            inactive_days = 30
+            react_df = get_reactivation_candidates(inactive_days)
 
-            # выбираем соответствующие им лейблы из client_options
-            reactive_default_labels = [
-                label for label, cid in client_options.items() if cid in react_ids
-            ]
+            if not react_df.empty:
+                react_ids = set(react_df["id"].tolist())
+                reactive_default_labels = [
+                    label for label, cid in client_options.items() if cid in react_ids
+                ]
+                reactive_info = (
+                    f"Найдено {len(react_ids)} клиентов для реактивации "
+                    f"(нет активности {inactive_days}+ дней)."
+                )
+            else:
+                reactive_info = (
+                    "Клиентов для реактивации по текущим критериям не найдено. "
+                    "Выберите получателей вручную."
+                )
 
-            reactive_info = (
-                f"Найдено {len(react_ids)} клиентов для реактивации "
-                f"(не было активности {inactive_days}+ дней). "
-                "Они выбраны в списке по умолчанию, но вы можете изменить выбор вручную."
-            )
-        else:
-            reactive_info = (
-                "Клиентов, подходящих под критерий реактивации, пока нет. "
-                "Выберите получателей вручную."
-            )
+        if reactive_info:
+            st.info(reactive_info)
 
-    if reactive_info:
-        st.info(reactive_info)
+        selected_client_labels = st.multiselect(
+            "Кому отправляем",
+            options=list(client_options.keys()),
+            default=reactive_default_labels,
+        )
+        selected_client_ids = [client_options[label] for label in selected_client_labels]
 
-    # --- multiselect с возможностью ручной правки ---
-    selected_client_labels = st.multiselect(
-        "Кому отправляем?",
-        options=list(client_options.keys()),
-        default=reactive_default_labels,  # 👈 тут как раз «уснувшие» для WINBACK
-    )
-    selected_client_ids = [client_options[label] for label in selected_client_labels]
+        # имя кампании
+        default_campaign_name = "Новая кампания"
+        campaign_name = st.text_input("Название кампании", value=default_campaign_name)
 
-    # --- имя кампании ---
-    default_campaign_name = "Новая кампания"
-    campaign_name = st.text_input("Название кампании", value=default_campaign_name)
+        create_clicked = st.button("Создать кампанию и отправить", use_container_width=True)
 
-    # --- кнопка создания кампании ---
-    if st.button("Создать кампанию и отправить"):
+    # ---------- ПРАВАЯ КОЛОНКА: СВОДКА ----------
+    with right_col:
+        st.subheader("Сводка кампании")
+        st.markdown(f"**Выбранный шаблон:**  \n{selected_template_label}")
+        st.markdown(f"**Тип кампании:**  `{selected_template_type}`")
+        st.markdown(f"**Выбрано клиентов:**  **{len(selected_client_ids)}**")
+
+        # небольшой превью-шаблон (если хочешь)
+        template_row = templates_df[templates_df["id"] == selected_template_id].iloc[0]
+        with st.expander("Посмотреть тему и текст письма (общий вид)"):
+            st.markdown(f"**Тема:** {template_row['subject']}")
+            st.markdown("**Тело (пример для мужчины):**")
+            st.write(template_row["body_male"])
+
+    # ---------- ОБРАБОТКА КНОПКИ ----------
+    if create_clicked:
         if not campaign_name.strip():
             st.warning("Введите название кампании.")
         elif not selected_client_ids:
             st.warning("Выберите хотя бы одного клиента.")
         else:
-            # создаём кампанию
             campaign_id = create_campaign(
                 name=campaign_name.strip(),
                 template_id=selected_template_id,
                 description=f"Создано из интерфейса Streamlit, шаблон id={selected_template_id}",
             )
 
-            # создаём отправки
             sent_count = create_campaign_clients(campaign_id, selected_client_ids)
 
             st.success(
@@ -123,11 +134,9 @@ if page == "Рассылка":
                 f"Отправлено писем: {sent_count}."
             )
 
-            # краткая таблица по клиентам этой кампании
             result_clients = clients_df[clients_df["id"].isin(selected_client_ids)][
                 ["id", "full_name", "email", "segment"]
-            ]
-            result_clients = result_clients.rename(
+            ].rename(
                 columns={
                     "id": "client_id",
                     "full_name": "ФИО",
@@ -137,7 +146,7 @@ if page == "Рассылка":
             )
 
             st.subheader("Список получателей кампании")
-            st.dataframe(result_clients)
+            st.dataframe(result_clients, use_container_width=True)
 
 # СТРАНИЦА «АНАЛИТИКА»
 elif page == "Аналитика":
@@ -222,69 +231,74 @@ elif page == "Аналитика":
 
     st.markdown("---")
 
-    # Динамика по времени (line-chart)
-    st.subheader("Динамика отправок по дням")
-
-    daily_agg = (
-        df.groupby("sent_date")
-          .agg(
-              sent=("cc_id", "size"),
-              opened=("status_norm", lambda s: s.isin(["OPENED", "CLICKED"]).sum()),
-              clicked=("status_norm", lambda s: (s == "CLICKED").sum()),
-          )
-          .sort_index()
+    tab_overall, tab_gender, tab_segment = st.tabs(
+        ["Общая статистика", "По полу", "По сегментам"]
     )
 
-    st.line_chart(daily_agg[["sent", "opened", "clicked"]])
-    st.markdown("---")
+    # ---------- вкладка "Общая статистика" ----------
+    with tab_overall:
+        st.subheader("Метрики по кампаниям")
 
+        st.dataframe(agg_campaign, use_container_width=True)
 
-    # Разрез по полу (gender)
-    st.subheader("Разрез по полу (gender)")
-
-    df_gender = df.dropna(subset=["gender"])
-    if df_gender.empty:
-        st.info("Нет данных о поле клиентов.")
-    else:
-        agg_gender = (
-            df_gender.groupby("gender")
-                     .agg(
-                         sent=("cc_id", "size"),
-                         opened=("status_norm", lambda s: s.isin(["OPENED", "CLICKED"]).sum()),
-                         clicked=("status_norm", lambda s: (s == "CLICKED").sum()),
-                     )
+        st.subheader("Динамика отправок по дням")
+        daily_agg = (
+            df.groupby("sent_date")
+            .agg(
+                sent=("cc_id", "size"),
+                opened=("status_norm", lambda s: s.isin(["OPENED", "CLICKED"]).sum()),
+                clicked=("status_norm", lambda s: (s == "CLICKED").sum()),
+            )
+            .sort_index()
         )
-        agg_gender["open_rate"] = agg_gender["opened"] / agg_gender["sent"]
-        agg_gender["click_rate"] = agg_gender["clicked"] / agg_gender["sent"]
+        st.line_chart(daily_agg[["sent", "opened", "clicked"]])
 
-        st.write("Таблица по полу:")
-        st.dataframe(agg_gender.reset_index(), use_container_width=True)
+    # ---------- вкладка "По полу" ----------
+    with tab_gender:
+        st.subheader("Разрез по полу (gender)")
+        df_gender = df.dropna(subset=["gender"])
 
-        st.write("График open_rate / click_rate по полу:")
-        st.bar_chart(agg_gender[["open_rate", "click_rate"]])
+        if df_gender.empty:
+            st.info("Нет данных о поле клиентов.")
+        else:
+            agg_gender = (
+                df_gender.groupby("gender")
+                .agg(
+                    sent=("cc_id", "size"),
+                    opened=("status_norm", lambda s: s.isin(["OPENED", "CLICKED"]).sum()),
+                    clicked=("status_norm", lambda s: (s == "CLICKED").sum()),
+                )
+            )
+            agg_gender["open_rate"] = agg_gender["opened"] / agg_gender["sent"]
+            agg_gender["click_rate"] = agg_gender["clicked"] / agg_gender["sent"]
 
-    st.markdown("---")
+            st.write("Таблица по полу:")
+            st.dataframe(agg_gender.reset_index(), use_container_width=True)
 
-    # Разрез по сегменту (segment)
-    st.subheader("Разрез по сегменту (segment)")
+            st.write("График open_rate / click_rate по полу:")
+            st.bar_chart(agg_gender[["open_rate", "click_rate"]])
 
-    df_segment = df.dropna(subset=["segment"])
-    if df_segment.empty:
-        st.info("Нет данных о сегментах клиентов.")
-    else:
-        agg_segment = (
-            df_segment.groupby("segment")
-                      .agg(
-                          sent=("cc_id", "size"),
-                          opened=("status_norm", lambda s: s.isin(["OPENED", "CLICKED"]).sum()),
-                          clicked=("status_norm", lambda s: (s == "CLICKED").sum()),
-                      )
-        )
-        agg_segment["open_rate"] = agg_segment["opened"] / agg_segment["sent"]
-        agg_segment["click_rate"] = agg_segment["clicked"] / agg_segment["sent"]
+    # ---------- вкладка "По сегментам" ----------
+    with tab_segment:
+        st.subheader("Разрез по сегментам (segment)")
+        df_segment = df.dropna(subset=["segment"])
 
-        st.write("Таблица по сегментам:")
-        st.dataframe(agg_segment.reset_index(), use_container_width=True)
+        if df_segment.empty:
+            st.info("Нет данных о сегментах клиентов.")
+        else:
+            agg_segment = (
+                df_segment.groupby("segment")
+                .agg(
+                    sent=("cc_id", "size"),
+                    opened=("status_norm", lambda s: s.isin(["OPENED", "CLICKED"]).sum()),
+                    clicked=("status_norm", lambda s: (s == "CLICKED").sum()),
+                )
+            )
+            agg_segment["open_rate"] = agg_segment["opened"] / agg_segment["sent"]
+            agg_segment["click_rate"] = agg_segment["clicked"] / agg_segment["sent"]
 
-        st.write("График open_rate / click_rate по сегментам:")
-        st.bar_chart(agg_segment[["open_rate", "click_rate"]])
+            st.write("Таблица по сегментам:")
+            st.dataframe(agg_segment.reset_index(), use_container_width=True)
+
+            st.write("График open_rate / click_rate по сегментам:")
+            st.bar_chart(agg_segment[["open_rate", "click_rate"]])

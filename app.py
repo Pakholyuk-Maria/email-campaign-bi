@@ -1,4 +1,3 @@
-# app.py
 import streamlit as st
 import pandas as pd
 
@@ -9,8 +8,8 @@ from db import (
     create_campaign_clients,
     get_campaigns,
     get_campaign_clients_joined,
+    get_reactivation_candidates,   # 👈 добавили
 )
-
 
 st.set_page_config(page_title="Email-рассылки", layout="wide")
 
@@ -18,12 +17,11 @@ st.title("Система email-рассылок и аналитики")
 
 page = st.sidebar.radio("Страница", ["Рассылка", "Аналитика"])
 
-
-# СТРАНИЦА «РАССЫЛКА»
+# ---------- СТРАНИЦА «РАССЫЛКА» ----------
 if page == "Рассылка":
     st.header("Создание кампании")
 
-    # Загрузка данных из БД
+    # Загружаем данные из БД
     templates_df = get_templates()
     clients_df = get_clients()
 
@@ -35,7 +33,7 @@ if page == "Рассылка":
         st.error("В базе нет ни одного клиента.")
         st.stop()
 
-    # выбор шаблона
+    # --- выбор шаблона ---
     template_options = {
         f"{row['id']}: {row['name']} ({row['type']})": row["id"]
         for _, row in templates_df.iterrows()
@@ -47,7 +45,12 @@ if page == "Рассылка":
     )
     selected_template_id = template_options[selected_template_label]
 
-    # выбор клиентов
+    # тип выбранного шаблона (WELCOME / DISCOUNT / WINBACK и т.д.)
+    selected_template_type = templates_df.loc[
+        templates_df["id"] == selected_template_id, "type"
+    ].iloc[0]
+
+    # --- подготовка списка клиентов ---
     st.subheader("Выберите клиентов")
 
     client_options = {
@@ -55,17 +58,50 @@ if page == "Рассылка":
         for _, row in clients_df.iterrows()
     }
 
+    # ---------- автоподбор «уснувших» для WINBACK ----------
+    reactive_default_labels = []
+    reactive_info = ""
+
+    if selected_template_type.upper() == "WINBACK":
+        inactive_days = 30  # можно потом вынести в настройку
+        react_df = get_reactivation_candidates(inactive_days)
+
+        if not react_df.empty:
+            # id клиентов-кандидатов
+            react_ids = set(react_df["id"].tolist())
+
+            # выбираем соответствующие им лейблы из client_options
+            reactive_default_labels = [
+                label for label, cid in client_options.items() if cid in react_ids
+            ]
+
+            reactive_info = (
+                f"Найдено {len(react_ids)} клиентов для реактивации "
+                f"(не было активности {inactive_days}+ дней). "
+                "Они выбраны в списке по умолчанию, но вы можете изменить выбор вручную."
+            )
+        else:
+            reactive_info = (
+                "Клиентов, подходящих под критерий реактивации, пока нет. "
+                "Выберите получателей вручную."
+            )
+
+    if reactive_info:
+        st.info(reactive_info)
+
+    # --- multiselect с возможностью ручной правки ---
     selected_client_labels = st.multiselect(
         "Кому отправляем?",
         options=list(client_options.keys()),
+        default=reactive_default_labels,  # 👈 тут как раз «уснувшие» для WINBACK
     )
     selected_client_ids = [client_options[label] for label in selected_client_labels]
 
-    # имя кампании
+    # --- имя кампании ---
     default_campaign_name = "Новая кампания"
     campaign_name = st.text_input("Название кампании", value=default_campaign_name)
 
-    # кнопка создания кампании
+    # --- кнопка создания кампании ---
     if st.button("Создать кампанию и отправить"):
         if not campaign_name.strip():
             st.warning("Введите название кампании.")
@@ -82,7 +118,10 @@ if page == "Рассылка":
             # создаём отправки
             sent_count = create_campaign_clients(campaign_id, selected_client_ids)
 
-            st.success(f"Кампания успешно создана (id={campaign_id}). Отправлено писем: {sent_count}.")
+            st.success(
+                f"Кампания успешно создана (id={campaign_id}). "
+                f"Отправлено писем: {sent_count}."
+            )
 
             # краткая таблица по клиентам этой кампании
             result_clients = clients_df[clients_df["id"].isin(selected_client_ids)][
@@ -98,8 +137,7 @@ if page == "Рассылка":
             )
 
             st.subheader("Список получателей кампании")
-            st.dataframe(result_clients, use_container_width=True)
-
+            st.dataframe(result_clients)
 
 # СТРАНИЦА «АНАЛИТИКА»
 elif page == "Аналитика":

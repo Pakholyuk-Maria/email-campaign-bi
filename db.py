@@ -2,7 +2,7 @@ import os
 import random
 from datetime import datetime, timezone, timedelta
 import pandas as pd
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 
 
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -202,4 +202,5 @@ def get_reactivation_candidates(inactive_days: int = 30) -> pd.DataFrame:
         df = pd.read_sql(sql, conn, params={"cutoff": cutoff})
 
     return df
+
 

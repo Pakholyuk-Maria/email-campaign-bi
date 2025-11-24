@@ -58,3 +58,68 @@ db.py         # функции работы с БД
 init_db.py    # создание схемы БД и наполнение фейковыми данными
 requirements.txt
 README.md
+```
+## Ссылка на приложение: 
+https://email-campaign-bi-btas3wtmxegjd2vhwjp2xk.streamlit.app/
+
+## Как запустить приложение локально
+
+В репозитории уже есть все необходимые файлы:
+
+- `app.py` — главный файл Streamlit-приложения (интерфейс).
+- `db.py` — функции для работы с базой данных.
+- `init_db.py` — скрипт создания схемы БД и наполнения тестовыми данными.
+- `requirements.txt` — список зависимостей.
+
+Шаги по запуску на своём компьютере.
+
+### 1. Предварительные требования
+
+- Python **3.10+**
+- PostgreSQL **13+**
+- (по желанию) Git для клонирования репозитория
+
+### 2. Клонировать репозиторий (или скачать ZIP)
+
+### 3. Создать базу данных в PostgreSQL
+Подключитесь к PostgreSQL (через psql или pgAdmin) и создайте базу:
+CREATE DATABASE email_campaign_db;
+
+Строка подключения к БД будет вида:
+postgresql+psycopg2://email_user:your_password@localhost:5432/email_campaign_db
+
+### 4. Создать и активировать виртуальное окружение
+Windows (cmd):
+
+.\.venv\Scripts\activate.bat
+
+Linux / macOS:
+
+source .venv/bin/activate
+
+### 5. Установить зависимости
+pip install -r requirements.txt
+
+### 6. Настроить переменную окружения DATABASE_URL
+
+Приложение использует переменную DATABASE_URL для подключения к БД.
+
+Подставьте свою строку подключения:
+- Windows (cmd): set DATABASE_URL=postgresql+psycopg2://email_user:your_password@localhost:5432/email_campaign_db
+- Linux / macOS: export DATABASE_URL="postgresql+psycopg2://email_user:your_password@localhost:5432/email_campaign_db"
+
+### 8. Запустить веб-приложение
+streamlit run app.py
+
+Streamlit поднимет сервер и в терминале покажет адрес, который нужно будет открыть в браузере.
+
+В боковом меню выберите «Рассылка»:
+- выберите шаблон письма;
+- выберите клиентов (для шаблона WINBACK «уснувшие» клиенты подставляются автоматически);
+- задайте название кампании;
+- нажмите «Создать кампанию и отправить».
+
+На вкладке «Аналитика»:
+- настройте фильтры по кампаниям и диапазону дат;
+- смотрите метрики отправок (sent, open_rate, click_rate);
+- анализируйте разрезы по полу (gender) и сегменту (segment), а также динамику по дням.

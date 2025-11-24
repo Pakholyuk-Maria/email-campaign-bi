@@ -8,7 +8,7 @@ from db import (
     create_campaign_clients,
     get_campaigns,
     get_campaign_clients_joined,
-    get_reactivation_candidates,   # 👈 добавили
+    get_reactivation_candidates,
 )
 
 st.set_page_config(page_title="Email-рассылки", layout="wide")
@@ -35,7 +35,7 @@ if page == "Рассылка":
 
     left_col, right_col = st.columns([2, 1])
 
-    # ---------- ЛЕВАЯ КОЛОНКА: ФОРМА ----------
+    # ЛЕВАЯ КОЛОНКА: ФОРМА
     with left_col:
         st.subheader("Настройки кампании")
 
@@ -100,21 +100,21 @@ if page == "Рассылка":
 
         create_clicked = st.button("Создать кампанию и отправить", use_container_width=True)
 
-    # ---------- ПРАВАЯ КОЛОНКА: СВОДКА ----------
+    # ПРАВАЯ КОЛОНКА: СВОДКА
     with right_col:
         st.subheader("Сводка кампании")
         st.markdown(f"**Выбранный шаблон:**  \n{selected_template_label}")
         st.markdown(f"**Тип кампании:**  `{selected_template_type}`")
         st.markdown(f"**Выбрано клиентов:**  **{len(selected_client_ids)}**")
 
-        # небольшой превью-шаблон (если хочешь)
+        # небольшой превью-шаблон
         template_row = templates_df[templates_df["id"] == selected_template_id].iloc[0]
         with st.expander("Посмотреть тему и текст письма (общий вид)"):
             st.markdown(f"**Тема:** {template_row['subject']}")
             st.markdown("**Тело (пример для мужчины):**")
             st.write(template_row["body_male"])
 
-    # ---------- ОБРАБОТКА КНОПКИ ----------
+    # Обработка кнопки
     if create_clicked:
         if not campaign_name.strip():
             st.warning("Введите название кампании.")
@@ -235,7 +235,7 @@ elif page == "Аналитика":
         ["Общая статистика", "По полу", "По сегментам"]
     )
 
-    # ---------- вкладка "Общая статистика" ----------
+    #вкладка "Общая статистика"
     with tab_overall:
         st.subheader("Метрики по кампаниям")
 
@@ -253,7 +253,7 @@ elif page == "Аналитика":
         )
         st.line_chart(daily_agg[["sent", "opened", "clicked"]])
 
-    # ---------- вкладка "По полу" ----------
+    #вкладка "По полу"
     with tab_gender:
         st.subheader("Разрез по полу (gender)")
         df_gender = df.dropna(subset=["gender"])
@@ -278,7 +278,7 @@ elif page == "Аналитика":
             st.write("График open_rate / click_rate по полу:")
             st.bar_chart(agg_gender[["open_rate", "click_rate"]])
 
-    # ---------- вкладка "По сегментам" ----------
+    #вкладка "По сегментам"
     with tab_segment:
         st.subheader("Разрез по сегментам (segment)")
         df_segment = df.dropna(subset=["segment"])
